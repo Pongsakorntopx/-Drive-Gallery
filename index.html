@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Google Drive Photo Picker Gallery</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <link href="https://fonts.googleapis.com/css?family=Prompt:400,700&display=swap" rel="stylesheet">
+  <style>
+    body {font-family:'Prompt',sans-serif;background:#f6f8fc;margin:0;}
+    header {background:#1976d2;color:#fff;padding:1.1rem 1rem;font-size:1.6rem;}
+    .main {max-width:980px;margin:2.5rem auto;background:#fff;border-radius:18px;box-shadow:0 4px 32px #0002;padding:2rem;}
+    .btn {background:#1976d2;color:#fff;border:none;border-radius:8px;padding:0.7em 1.5em;cursor:pointer;font-size:1.08rem;}
+    #gallery {display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1.3rem;}
+    .card {background:#f7fafd;border-radius:1em;box-shadow:0 2px 12px #0001;overflow:hidden;}
+    .card img {width:100%;display:block;}
+    .card .title {font-size:1rem;padding:0.5em 1em;color:#1976d2;}
+    .info {color:#555;font-size:1.07rem;margin-bottom:1.2em;}
+  </style>
+</head>
+<body>
+<header>
+  Google Drive Photo Gallery
+</header>
+<div class="main">
+  <div id="auth-area">
+    <button class="btn" id="login-btn" onclick="handleAuthClick()">🔑 Login with Google</button>
+    <button class="btn" id="logout-btn" onclick="handleSignoutClick()" style="display:none;">Logout</button>
+  </div>
+  <div id="step2" style="display:none;">
+    <div class="info">เลือกโฟลเดอร์ Google Drive ที่ต้องการแสดงภาพ</div>
+    <button class="btn" id="pick-btn" onclick="showPicker()">เลือกโฟลเดอร์</button>
+    <span id="folder-info"></span>
+  </div>
+  <div id="gallery"></div>
+  <div id="loading" style="text-align:center;margin:1.7rem;display:none;">กำลังโหลด...</div>
+</div>
+
+<script>
+  // ====== CONFIG ของคุณ ======
+  const CLIENT_ID = '258829783034-fthiotfelubgc5v5cr1l96fj2ta02v3u.apps.googleusercontent.com';
+  const API_KEY = 'AIzaSyA1shyUv4z3r__x2FGsZp-C9Pcmwl_1qHk';
+  const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+  // ===========================
+
+  let tokenClient;
+  let accessToken = null, pickedFolderId = null;
+
+  let gapiLoaded = false;
+  let pickerLoaded = false;
+  let clientInited = false;
+
+  // 1. Load GAPI & Picker
+  function onGAPILoad() {
+    gapi.load('client:picker', async function() {
+      gapiLoaded = true;
+      await gapi.client.init({
+        apiKey: API_KEY,
+        discoveryDocs:["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"]
+      });
+      clientInited = true;
+      document.getElementById('login-btn').disabled = false;
+    });
+  }
+  // รอ api.js load เสร็จจริงก่อนเรียก onGAPILoad
+  window.addEventListener('load', () => {
+    if (window.gapi) onGAPILoad();
+    else {
+      // fallback: poll check
+      let timer = setInterval(()=>{
+        if(window.gapi) {
+          clearInterval(timer); onGAPILoad();
+        }
+      }, 100);
+    }
+  });
+
+  // 2. Login with Google
+  window.handleAuthClick = function() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: async (tokenResponse) => {
+        accessToken = tokenResponse.access_token;
+        document.getElementById('login-btn').style.display = "none";
+        document.getElementById('logout-btn').style.display = "inline-block";
+        document.getElementById('step2').style.display = "";
+        showNotify('เข้าสู่ระบบสำเร็จ');
+      },
+      error_callback: (err) => {
+        showNotify('Google login failed: ' + (err && err.error_description ? err.error_description : 'Unknown'));
+      }
+    });
+    tokenClient.requestAccessToken();
+  };
+
+  // 3. Logout
+  window.handleSignoutClick = function() {
+    accessToken = null;
+    document.getElementById('login-btn').style.display = "inline-block";
+    document.getElementById('logout-btn').style.display = "none";
+    document.getElementById('step2').style.display = "none";
+    document.getElementById('gallery').innerHTML = "";
+    document.getElementById('folder-info').innerHTML = "";
+    showNotify('ออกจากระบบแล้ว');
+  };
+
+  // 4. Google Picker (เลือกโฟลเดอร์)
+  function showPicker() {
+    if (!accessToken) return showNotify('กรุณา Login ก่อน');
+    if (!window.google || !window.google.picker) return showNotify('Picker API ยังไม่โหลด ลองรีเฟรช');
+
+    let view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+      .setMimeTypes('application/vnd.google-apps.folder')
+      .setSelectFolderEnabled(true);
+
+    let picker = new google.picker.PickerBuilder()
+      .addView(view)
+      .setOAuthToken(accessToken)
+      .setDeveloperKey(API_KEY)
+      .setTitle("เลือกโฟลเดอร์ภาพจาก Google Drive")
+      .setCallback(pickerCallback)
+      .build();
+    picker.setVisible(true);
+  }
+
+  function pickerCallback(data) {
+    if (data.action == google.picker.Action.PICKED) {
+      pickedFolderId = data.docs[0].id;
+      document.getElementById('folder-info').innerHTML = `📂 <b>${data.docs[0].name}</b>`;
+      listImagesInFolder(pickedFolderId);
+    }
+  }
+
+  // 5. ดึงไฟล์ภาพในโฟลเดอร์
+  async function listImagesInFolder(folderId) {
+    document.getElementById('gallery').innerHTML = "";
+    document.getElementById('loading').style.display = "block";
+    try {
+      let res = await gapi.client.drive.files.list({
+        q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
+        fields: "files(id,name,thumbnailLink,webContentLink)",
+        pageSize: 100,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+      });
+      let files = res.result.files || [];
+      let html = "";
+      files.forEach(f=>{
+        let src = f.thumbnailLink ? f.thumbnailLink.replace("=s220", "=s800") : f.webContentLink;
+        html += `<div class="card">
+          <img src="${src}" alt="${f.name}" loading="lazy">
+          <div class="title">${f.name}</div>
+        </div>`;
+      });
+      document.getElementById('gallery').innerHTML = html || "<div>ไม่พบภาพในโฟลเดอร์นี้</div>";
+    } catch (err) {
+      showNotify("ดึงรูปไม่สำเร็จ: "+(err.result && err.result.error && err.result.error.message?err.result.error.message:err.message));
+    }
+    document.getElementById('loading').style.display = "none";
+  }
+
+  // 6. Notify
+  function showNotify(msg) {
+    let d = document.createElement('div');
+    d.style = "position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#fffbe2;padding:0.6em 2em;border-radius:1.2em;box-shadow:0 4px 32px #0002;z-index:1111;color:#444;font-size:1.1em;";
+    d.innerHTML = msg;
+    document.body.appendChild(d);
+    setTimeout(()=>d.remove(),1700);
+  }
+</script>
+</body>
+</html>

@@ -135,32 +135,47 @@
     }
   }
 
-  // 5. ดึงไฟล์ภาพในโฟลเดอร์ (เวอร์ชันใหม่ ใช้ direct link)
+  // 5. ดึงไฟล์ภาพในโฟลเดอร์ (โหลดด้วย token แบบ blob)
   async function listImagesInFolder(folderId) {
     document.getElementById('gallery').innerHTML = "";
     document.getElementById('loading').style.display = "block";
     try {
       let res = await gapi.client.drive.files.list({
         q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
-        fields: "files(id,name)",
-        pageSize: 100,
+        fields: "files(id,name,mimeType)",
+        pageSize: 40,
         supportsAllDrives: true,
         includeItemsFromAllDrives: true,
       });
       let files = res.result.files || [];
+      if (!files.length) {
+        document.getElementById('gallery').innerHTML = "<div>ไม่พบภาพในโฟลเดอร์นี้</div>";
+        document.getElementById('loading').style.display = "none";
+        return;
+      }
       let html = "";
-      files.forEach(f => {
-        let imgSrc = `https://drive.google.com/uc?export=view&id=${f.id}`;
+      for (let f of files) {
+        let blobUrl = await getDriveFileBlobUrl(f.id);
         html += `<div class="card">
-          <img src="${imgSrc}" alt="${f.name}" loading="lazy">
+          <img src="${blobUrl}" alt="${f.name}" loading="lazy">
           <div class="title">${f.name}</div>
         </div>`;
-      });
-      document.getElementById('gallery').innerHTML = html || "<div>ไม่พบภาพในโฟลเดอร์นี้</div>";
+      }
+      document.getElementById('gallery').innerHTML = html;
     } catch (err) {
       showNotify("ดึงรูปไม่สำเร็จ: " + (err.result && err.result.error && err.result.error.message ? err.result.error.message : err.message));
     }
     document.getElementById('loading').style.display = "none";
+  }
+
+  // ใช้ token ไปดึงรูป Google Drive แบบ blob (ไม่ต้องแชร์ public)
+  async function getDriveFileBlobUrl(fileId) {
+    let url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+    let res = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    });
+    let blob = await res.blob();
+    return URL.createObjectURL(blob);
   }
 
   // 6. Notify

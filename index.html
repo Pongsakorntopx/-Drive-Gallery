@@ -4,36 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>แกลเลอรี่รูปภาพจาก Google Drive</title>
-  <!-- ฟอนต์และสไตล์ของคุณทั้งหมด -->
-  <link href="https://fonts.googleapis.com/css2?family=Exo+2&family=Fira+Sans&family=K2D&family=Kanit&family=Mitr&family=Merriweather&family=Montserrat&family=Noto+Sans+Thai&family=Noto+Serif+Thai&family=Open+Sans&family=PT+Sans&family=PT+Serif&family=Prompt&family=Roboto&family=Rubik&family=Sarabun&family=Thasadith&family=Tahomee&family=Work+Sans&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Pacifico&family=Amatic+SC&family=Dancing+Script&family=Shadows+Into+Light&family=Caveat&family=Satisfy&family=Lobster+Two&family=Cookie&family=Gloria+Hallelujah&family=Permanent+Marker&family=Covered+By+Your+Grace&family=Handlee&family=Patrick+Hand&family=Architects+Daughter&family=Sacramento&family=Great+Vibes&family=Damion&family=Yellowtail&family=Homemade+Apple&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://apis.google.com/js/api.js"></script>
-  <style id="dynamicStyles"></style>
   <style>
     body {font-family:'Prompt',sans-serif;background:#e0e5ec;margin:0;padding:0;text-align:center;}
     #googleAuthArea { margin: 18px 0 0 0; }
     .btn { background:#1976d2;color:#fff;border:none;border-radius:8px;padding:0.7em 1.5em;cursor:pointer;font-size:1.1rem; }
-    .btn[disabled] { opacity:0.5; pointer-events: none;}
     .gallery {display: grid;grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));gap: 20px;padding: 20px;}
-    .image-item {background-color: #e0e5ec;border-radius: 12px;text-align: center;padding: 8px;position: relative;display: flex;align-items: center;justify-content: center;overflow: hidden;transition: transform 0.3s ease, box-shadow 0.3s ease;box-shadow: 0 0 8px 4px #bebebe;}
-    .image-item:hover { background-color: #d1e7ff; }
-    .image-item img { border-radius: 8px; cursor: pointer; width: 100%; height: auto; transition: all 0.3s ease;}
-    #loadingSpinner {
-      display: none;
-      position: fixed; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 2000;
-    }
-    .spinner {
-      border: 8px solid #f3f3f3;
-      border-top: 8px solid #333;
-      border-radius: 50%;
-      width: 60px; height: 60px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .image-item {background-color: #e0e5ec;border-radius: 12px;text-align: center;padding: 8px;}
+    .image-item img { border-radius: 8px; cursor: pointer; width: 100%; height: auto;}
     #notification {
       position: fixed; top: 10px; left: 50%;
       transform: translateX(-50%);
@@ -42,42 +23,8 @@
       z-index: 3000; display: none;
       opacity: 0; transition: opacity 0.5s ease;
     }
-    .header-banner {
-      background-color: #e0e5ec; border-radius: 12px;
-      padding: 20px 30px; margin: 20px;
-      text-align: center; position: relative;
-      transition: all 0.3s ease;
-      box-shadow: 0 0 16px 4px #bebebe
-    }
-    #headerTitle { font-size: 20px; margin: 0; transition: all 0.3s ease; }
-    .modal {display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:1002;}
-    .modal.show {display:block;}
-    .modal-content {max-width:90%;max-height:80vh;margin:auto;display:block;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:12px;}
-    .modal-controls {position:absolute;top:15px;right:15px;display:flex;gap:5px;z-index:1003;}
-    .mac-btn {width:24px;height:24px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;margin:0 5px;}
-    .mac-close {background-color:#ff5f57;}
-    .mac-fullscreen {background-color:#28c940;}
-    .mac-slideshow {background-color:#ffbd2e;}
-    #prevBtn,#nextBtn {position:absolute;top:50%;transform:translateY(-50%);font-size:30px;background:transparent;border:none;color:#333;}
-    #prevBtn {left:10px;}
-    #nextBtn {right:10px;}
-    #modalQRCode {position:absolute;bottom:20px;left:20px;background:#e0e5ec;padding:10px;border-radius:8px;z-index:1003;box-shadow:0 0 8px 4px #bebebe}
-    .warnbox {
-      margin: 18px auto 8px auto;
-      max-width: 480px;
-      background: #fffbe6;
-      color: #b8731c;
-      border: 1px solid #ffd591;
-      border-radius: 8px;
-      font-size: 1.09rem;
-      padding: 12px 18px;
-      text-align: left;
-      display: flex;
-      align-items: flex-start;
-      gap: 9px;
-    }
+    .warnbox {margin:18px auto 8px auto;max-width:480px;background:#fffbe6;color:#b8731c;border:1px solid #ffd591;border-radius:8px;font-size:1.09rem;padding:12px 18px;text-align:left;}
     .warnbox b { color: #ff9800; }
-    .warnicon { font-size:1.2em;line-height:1.4;}
   </style>
 </head>
 <body>
@@ -86,54 +33,25 @@
     <button class="btn" id="logout-btn" onclick="handleSignoutClick()" style="display:none;">Logout</button>
     <span id="user-email" style="margin-left: 15px; font-size:1.1rem;"></span>
   </div>
-
   <div class="warnbox" id="shareHint" style="display:none;">
-    <span class="warnicon">⚠️</span>
-    <span>
-      กรุณาตั้งค่าการแชร์ <b>โฟลเดอร์ Google Drive ของคุณเป็น “Anyone with the link”</b> (ให้ทุกคนที่มีลิงก์เข้าถึงได้) <br>
-      <small>หลังจากนั้นจึงเลือกโฟลเดอร์นี้ในรายการด้านล่าง ระบบไม่สามารถตรวจสอบสิทธิ์ public ให้คุณโดยอัตโนมัติ</small>
-    </span>
+    ⚠️ กรุณาตั้งค่าการแชร์ <b>โฟลเดอร์ Google Drive ของคุณเป็น “Anyone with the link”</b> (ให้ทุกคนที่มีลิงก์เข้าถึงได้)<br>
+    หลังจากนั้นจึงเลือกโฟลเดอร์นี้ในรายการด้านล่าง ระบบไม่สามารถตรวจสอบสิทธิ์ public ให้คุณโดยอัตโนมัติ
   </div>
-
   <div id="chooseFolderArea" style="display:none;margin:18px 0;">
     <select id="folderSelect" style="min-width:240px;"></select>
     <button class="btn" onclick="onPickFolder()">เลือกโฟลเดอร์</button>
   </div>
-
-  <div class="header-banner">
-    <h1 id="headerTitle">Google Drive Gallery</h1>
-  </div>
-
   <div class="gallery" id="gallery"></div>
-  <div id="loadingSpinner"><div class="spinner"></div></div>
   <div id="notification"></div>
-  <div id="imageModal" class="modal">
-    <div class="modal-controls">
-      <button id="slideshowBtn" class="mac-btn mac-slideshow" onclick="toggleSlideshow()">▶</button>
-      <button id="fullscreenBtn" class="mac-btn mac-fullscreen" onclick="toggleFullScreen()">⛶</button>
-      <button id="closeBtn" class="mac-btn mac-close" onclick="closeModal()">&times;</button>
-    </div>
-    <img class="modal-content" id="modalImage">
-    <div id="modalDetails" style="color:#000;padding:10px;"></div>
-    <div id="modalQRCode"></div>
-    <button id="prevBtn" onclick="prevImage()">&#10094;</button>
-    <button id="nextBtn" onclick="nextImage()">&#10095;</button>
-  </div>
 <script>
-  // ====== CONFIG GOOGLE ======
   const CLIENT_ID = '258829783034-fthiotfelubgc5v5cr1l96fj2ta02v3u.apps.googleusercontent.com';
   const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email';
-  // ===========================
 
   let accessToken = null;
   let userEmail = null;
   let pickedFolderId = null;
   let allImages = [];
-  let currentImageIndex = 0;
-  let slideshowInterval = null;
-  let slideshowPlaying = false;
 
-  // โหลด GAPI
   function onGAPILoad() {
     gapi.load('client', async function() {
       await gapi.client.init({
@@ -153,7 +71,6 @@
     }
   });
 
-  // Login/Logout
   window.handleAuthClick = function() {
     const tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
@@ -165,7 +82,7 @@
         await getUserEmail();
         await listMyFolders();
         document.getElementById('chooseFolderArea').style.display = "";
-        document.getElementById('shareHint').style.display = "flex";
+        document.getElementById('shareHint').style.display = "block";
         showNotification('เข้าสู่ระบบสำเร็จ');
       }
     });
@@ -183,7 +100,6 @@
     showNotification('ออกจากระบบแล้ว');
   };
 
-  // Get User Email
   async function getUserEmail() {
     let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: {Authorization: `Bearer ${accessToken}`}
@@ -193,7 +109,6 @@
     document.getElementById('user-email').innerHTML = userEmail ? `👤 ${userEmail}` : '';
   }
 
-  // List folders owned by user (ให้ user ตั้งค่าการแชร์ anyone เอง)
   async function listMyFolders() {
     document.getElementById('folderSelect').innerHTML = "<option>กำลังค้นหาโฟลเดอร์...</option>";
     let pageToken = null, folders = [];
@@ -217,8 +132,7 @@
       sel.innerHTML = folders.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
       pickedFolderId = folders[0].id;
     }
-    // แสดงกล่องเตือนบนจอ
-    document.getElementById('shareHint').style.display = "flex";
+    document.getElementById('shareHint').style.display = "block";
   }
 
   function onPickFolder() {
@@ -234,7 +148,6 @@
 
   async function fetchImagesInFolder(folderId) {
     document.getElementById('gallery').innerHTML = '';
-    document.getElementById('loadingSpinner').style.display = 'block';
     try {
       let res = await gapi.client.drive.files.list({
         q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
@@ -249,7 +162,6 @@
     } catch (err) {
       document.getElementById('gallery').innerHTML = "<div>เกิดข้อผิดพลาดในการดึงภาพ</div>";
     }
-    document.getElementById('loadingSpinner').style.display = 'none';
   }
 
   function displayImages(images) {
@@ -257,65 +169,9 @@
     gallery.innerHTML = images.map((image,i) => `
       <div class="image-item" data-driveid="${image.id}">
         <img src="https://drive.google.com/uc?export=view&id=${image.id}" 
-             alt="${image.name}" style="width:400px;" onclick="openModal('${image.id}',${i})">
+             alt="${image.name}" style="width:100%;max-width:400px;">
       </div>
     `).join('');
-  }
-
-  function openModal(imageId,index){
-    currentImageIndex = index;
-    const modal = document.getElementById('imageModal');
-    const modalImg = document.getElementById('modalImage');
-    const modalDetails = document.getElementById('modalDetails');
-    const modalQRCode = document.getElementById('modalQRCode');
-    modal.style.display = "block";
-    modal.classList.add("show");
-    let imgData = allImages[currentImageIndex];
-    modalImg.src = `https://drive.google.com/uc?export=view&id=${imgData.id}`;
-    let createdTimeFormatted = imgData ? new Date(imgData.createdTime).toLocaleString() : '';
-    modalDetails.innerHTML = `<p>${imgData ? imgData.name : ''}</p><p>${createdTimeFormatted}</p>`;
-    modalQRCode.innerHTML = "";
-    new QRCode(modalQRCode, {
-      text: `https://drive.google.com/uc?id=${imgData.id}`,
-      width: 100,
-      height: 100
-    });
-  }
-  function closeModal(){
-    document.getElementById('imageModal').classList.remove('show');
-    document.getElementById('imageModal').style.display = "none";
-    if(slideshowPlaying)toggleSlideshow();
-  }
-  function nextImage(){
-    if(allImages.length===0)return;
-    currentImageIndex = (currentImageIndex + 1) % allImages.length;
-    let img = allImages[currentImageIndex];
-    openModal(img.id,currentImageIndex);
-  }
-  function prevImage(){
-    if(allImages.length===0)return;
-    currentImageIndex = (currentImageIndex - 1 + allImages.length) % allImages.length;
-    let img = allImages[currentImageIndex];
-    openModal(img.id,currentImageIndex);
-  }
-  function toggleSlideshow(){
-    if(slideshowPlaying){
-      clearInterval(slideshowInterval);
-      slideshowPlaying = false;
-      document.getElementById('slideshowBtn').textContent = '▶';
-    }else{
-      slideshowInterval = setInterval(nextImage,3000);
-      slideshowPlaying = true;
-      document.getElementById('slideshowBtn').textContent = '❚❚';
-    }
-  }
-  function toggleFullScreen(){
-    const modal = document.getElementById('imageModal');
-    if(!document.fullscreenElement){
-      modal.requestFullscreen().catch(err=>alert(err.message));
-    }else{
-      document.exitFullscreen();
-    }
   }
 
   function showNotification(message) {

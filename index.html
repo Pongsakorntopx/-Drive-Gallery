@@ -42,7 +42,6 @@
       z-index: 3000; display: none;
       opacity: 0; transition: opacity 0.5s ease;
     }
-    /* Header Banner */
     .header-banner {
       background-color: #e0e5ec; border-radius: 12px;
       padding: 20px 30px; margin: 20px;
@@ -51,7 +50,6 @@
       box-shadow: 0 0 16px 4px #bebebe
     }
     #headerTitle { font-size: 20px; margin: 0; transition: all 0.3s ease; }
-    /* Lightbox/Modal */
     .modal {display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:1002;}
     .modal.show {display:block;}
     .modal-content {max-width:90%;max-height:80vh;margin:auto;display:block;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:12px;}
@@ -64,15 +62,39 @@
     #prevBtn {left:10px;}
     #nextBtn {right:10px;}
     #modalQRCode {position:absolute;bottom:20px;left:20px;background:#e0e5ec;padding:10px;border-radius:8px;z-index:1003;box-shadow:0 0 8px 4px #bebebe}
+    .warnbox {
+      margin: 18px auto 8px auto;
+      max-width: 480px;
+      background: #fffbe6;
+      color: #b8731c;
+      border: 1px solid #ffd591;
+      border-radius: 8px;
+      font-size: 1.09rem;
+      padding: 12px 18px;
+      text-align: left;
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+    }
+    .warnbox b { color: #ff9800; }
+    .warnicon { font-size:1.2em;line-height:1.4;}
   </style>
 </head>
 <body>
-  <!-- Login/Logout + โฟลเดอร์ dropdown -->
   <div id="googleAuthArea">
     <button class="btn" id="login-btn" onclick="handleAuthClick()">🔑 Login with Google</button>
     <button class="btn" id="logout-btn" onclick="handleSignoutClick()" style="display:none;">Logout</button>
     <span id="user-email" style="margin-left: 15px; font-size:1.1rem;"></span>
   </div>
+
+  <div class="warnbox" id="shareHint" style="display:none;">
+    <span class="warnicon">⚠️</span>
+    <span>
+      กรุณาตั้งค่าการแชร์ <b>โฟลเดอร์ Google Drive ของคุณเป็น “Anyone with the link”</b> (ให้ทุกคนที่มีลิงก์เข้าถึงได้) <br>
+      <small>หลังจากนั้นจึงเลือกโฟลเดอร์นี้ในรายการด้านล่าง ระบบไม่สามารถตรวจสอบสิทธิ์ public ให้คุณโดยอัตโนมัติ</small>
+    </span>
+  </div>
+
   <div id="chooseFolderArea" style="display:none;margin:18px 0;">
     <select id="folderSelect" style="min-width:240px;"></select>
     <button class="btn" onclick="onPickFolder()">เลือกโฟลเดอร์</button>
@@ -82,11 +104,9 @@
     <h1 id="headerTitle">Google Drive Gallery</h1>
   </div>
 
-  <!-- Gallery -->
   <div class="gallery" id="gallery"></div>
   <div id="loadingSpinner"><div class="spinner"></div></div>
   <div id="notification"></div>
-  <!-- Modal Lightbox -->
   <div id="imageModal" class="modal">
     <div class="modal-controls">
       <button id="slideshowBtn" class="mac-btn mac-slideshow" onclick="toggleSlideshow()">▶</button>
@@ -107,7 +127,6 @@
 
   let accessToken = null;
   let userEmail = null;
-  let publicFolders = [];
   let pickedFolderId = null;
   let allImages = [];
   let currentImageIndex = 0;
@@ -144,8 +163,9 @@
         document.getElementById('login-btn').style.display = "none";
         document.getElementById('logout-btn').style.display = "inline-block";
         await getUserEmail();
-        await listPublicFolders();
+        await listMyFolders();
         document.getElementById('chooseFolderArea').style.display = "";
+        document.getElementById('shareHint').style.display = "flex";
         showNotification('เข้าสู่ระบบสำเร็จ');
       }
     });
@@ -159,6 +179,7 @@
     document.getElementById('logout-btn').style.display = "none";
     document.getElementById('chooseFolderArea').style.display = "none";
     document.getElementById('gallery').innerHTML = '';
+    document.getElementById('shareHint').style.display = "none";
     showNotification('ออกจากระบบแล้ว');
   };
 
@@ -172,15 +193,14 @@
     document.getElementById('user-email').innerHTML = userEmail ? `👤 ${userEmail}` : '';
   }
 
-  // List only shared folders (Anyone with the link)
-  async function listPublicFolders() {
+  // List folders owned by user (ให้ user ตั้งค่าการแชร์ anyone เอง)
+  async function listMyFolders() {
     document.getElementById('folderSelect').innerHTML = "<option>กำลังค้นหาโฟลเดอร์...</option>";
-    publicFolders = [];
     let pageToken = null, folders = [];
     do {
       let res = await gapi.client.drive.files.list({
         q: `mimeType = 'application/vnd.google-apps.folder' and trashed = false and 'me' in owners`,
-        fields: "nextPageToken,files(id,name,permissions)",
+        fields: "nextPageToken,files(id,name)",
         pageToken: pageToken,
         pageSize: 100,
         supportsAllDrives: true,
@@ -189,23 +209,18 @@
       folders = folders.concat(res.result.files);
       pageToken = res.result.nextPageToken;
     } while (pageToken);
-
-    publicFolders = folders.filter(f=>{
-      if (!f.permissions) return false;
-      return f.permissions.some(p => p.type==="anyone" && (p.role==="reader" || p.role==="writer" || p.role==="owner"));
-    });
-
     let sel = document.getElementById('folderSelect');
-    if(publicFolders.length === 0) {
-      sel.innerHTML = "<option value=''>ไม่มีโฟลเดอร์ที่แชร์แบบ Anyone with the link</option>";
+    if(folders.length === 0) {
+      sel.innerHTML = "<option value=''>คุณยังไม่มีโฟลเดอร์</option>";
       pickedFolderId = null;
     } else {
-      sel.innerHTML = publicFolders.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
-      pickedFolderId = publicFolders[0].id;
+      sel.innerHTML = folders.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
+      pickedFolderId = folders[0].id;
     }
+    // แสดงกล่องเตือนบนจอ
+    document.getElementById('shareHint').style.display = "flex";
   }
 
-  // เมื่อเลือกโฟลเดอร์
   function onPickFolder() {
     let sel = document.getElementById('folderSelect');
     pickedFolderId = sel.value;
@@ -217,7 +232,6 @@
     fetchImagesInFolder(pickedFolderId);
   }
 
-  // ดึงและแสดงรูปจากโฟลเดอร์ที่เลือก
   async function fetchImagesInFolder(folderId) {
     document.getElementById('gallery').innerHTML = '';
     document.getElementById('loadingSpinner').style.display = 'block';
@@ -238,7 +252,6 @@
     document.getElementById('loadingSpinner').style.display = 'none';
   }
 
-  // แสดงผลภาพ (รองรับ Lightbox/QR/Slideshow/Modal)
   function displayImages(images) {
     const gallery = document.getElementById('gallery');
     gallery.innerHTML = images.map((image,i) => `
@@ -249,7 +262,6 @@
     `).join('');
   }
 
-  // Lightbox Modal
   function openModal(imageId,index){
     currentImageIndex = index;
     const modal = document.getElementById('imageModal');
@@ -306,7 +318,6 @@
     }
   }
 
-  // Notification
   function showNotification(message) {
     const notification = document.getElementById('notification');
     notification.textContent = message;

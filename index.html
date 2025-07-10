@@ -2,61 +2,122 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>Google Drive Public Folder Gallery</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>แกลเลอรี่รูปภาพจาก Google Drive</title>
+  <!-- ฟอนต์และสไตล์ของคุณทั้งหมด -->
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2&family=Fira+Sans&family=K2D&family=Kanit&family=Mitr&family=Merriweather&family=Montserrat&family=Noto+Sans+Thai&family=Noto+Serif+Thai&family=Open+Sans&family=PT+Sans&family=PT+Serif&family=Prompt&family=Roboto&family=Rubik&family=Sarabun&family=Thasadith&family=Tahomee&family=Work+Sans&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Pacifico&family=Amatic+SC&family=Dancing+Script&family=Shadows+Into+Light&family=Caveat&family=Satisfy&family=Lobster+Two&family=Cookie&family=Gloria+Hallelujah&family=Permanent+Marker&family=Covered+By+Your+Grace&family=Handlee&family=Patrick+Hand&family=Architects+Daughter&family=Sacramento&family=Great+Vibes&family=Damion&family=Yellowtail&family=Homemade+Apple&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://apis.google.com/js/api.js"></script>
-  <link href="https://fonts.googleapis.com/css?family=Prompt:400,700&display=swap" rel="stylesheet">
+  <style id="dynamicStyles"></style>
   <style>
-    body {font-family:'Prompt',sans-serif;background:#f6f8fc;margin:0;}
-    header {background:#1976d2;color:#fff;padding:1.1rem 1rem;font-size:1.6rem;}
-    .main {max-width:980px;margin:2.5rem auto;background:#fff;border-radius:18px;box-shadow:0 4px 32px #0002;padding:2rem;}
-    .btn {background:#1976d2;color:#fff;border:none;border-radius:8px;padding:0.7em 1.5em;cursor:pointer;font-size:1.08rem;}
-    #gallery {display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1.3rem;}
-    .card {background:#f7fafd;border-radius:1em;box-shadow:0 2px 12px #0001;overflow:hidden;transition:box-shadow .23s;}
-    .card:hover {box-shadow: 0 4px 24px #1976d255;}
-    .card img {width:100%;display:block;transition:transform 0.24s;cursor:pointer;background:#eee;}
-    .card img:hover {transform:scale(1.06);box-shadow:0 8px 24px #0002;}
-    .card .title {font-size:1rem;padding:0.5em 1em;color:#1976d2;}
-    .info {color:#555;font-size:1.07rem;margin-bottom:1.2em;}
-    select {font-size:1.09rem;padding:0.38em 1em;border-radius:8px;}
+    body {font-family:'Prompt',sans-serif;background:#e0e5ec;margin:0;padding:0;text-align:center;}
+    #googleAuthArea { margin: 18px 0 0 0; }
+    .btn { background:#1976d2;color:#fff;border:none;border-radius:8px;padding:0.7em 1.5em;cursor:pointer;font-size:1.1rem; }
+    .btn[disabled] { opacity:0.5; pointer-events: none;}
+    .gallery {display: grid;grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));gap: 20px;padding: 20px;}
+    .image-item {background-color: #e0e5ec;border-radius: 12px;text-align: center;padding: 8px;position: relative;display: flex;align-items: center;justify-content: center;overflow: hidden;transition: transform 0.3s ease, box-shadow 0.3s ease;box-shadow: 0 0 8px 4px #bebebe;}
+    .image-item:hover { background-color: #d1e7ff; }
+    .image-item img { border-radius: 8px; cursor: pointer; width: 100%; height: auto; transition: all 0.3s ease;}
+    #loadingSpinner {
+      display: none;
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2000;
+    }
+    .spinner {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #333;
+      border-radius: 50%;
+      width: 60px; height: 60px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #notification {
+      position: fixed; top: 10px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8); color: #fff;
+      padding: 10px 20px; border-radius: 5px;
+      z-index: 3000; display: none;
+      opacity: 0; transition: opacity 0.5s ease;
+    }
+    /* Header Banner */
+    .header-banner {
+      background-color: #e0e5ec; border-radius: 12px;
+      padding: 20px 30px; margin: 20px;
+      text-align: center; position: relative;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 16px 4px #bebebe
+    }
+    #headerTitle { font-size: 20px; margin: 0; transition: all 0.3s ease; }
+    /* Lightbox/Modal */
+    .modal {display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);z-index:1002;}
+    .modal.show {display:block;}
+    .modal-content {max-width:90%;max-height:80vh;margin:auto;display:block;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:12px;}
+    .modal-controls {position:absolute;top:15px;right:15px;display:flex;gap:5px;z-index:1003;}
+    .mac-btn {width:24px;height:24px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;outline:none;margin:0 5px;}
+    .mac-close {background-color:#ff5f57;}
+    .mac-fullscreen {background-color:#28c940;}
+    .mac-slideshow {background-color:#ffbd2e;}
+    #prevBtn,#nextBtn {position:absolute;top:50%;transform:translateY(-50%);font-size:30px;background:transparent;border:none;color:#333;}
+    #prevBtn {left:10px;}
+    #nextBtn {right:10px;}
+    #modalQRCode {position:absolute;bottom:20px;left:20px;background:#e0e5ec;padding:10px;border-radius:8px;z-index:1003;box-shadow:0 0 8px 4px #bebebe}
   </style>
 </head>
 <body>
-<header>
-  Google Drive Public Folder Gallery
-</header>
-<div class="main">
-  <div id="auth-area">
+  <!-- Login/Logout + โฟลเดอร์ dropdown -->
+  <div id="googleAuthArea">
     <button class="btn" id="login-btn" onclick="handleAuthClick()">🔑 Login with Google</button>
     <button class="btn" id="logout-btn" onclick="handleSignoutClick()" style="display:none;">Logout</button>
+    <span id="user-email" style="margin-left: 15px; font-size:1.1rem;"></span>
   </div>
-  <div id="step2" style="display:none;">
-    <div class="info">เลือกโฟลเดอร์ Google Drive <b>(ที่แชร์แบบ Anyone with the link)</b> เพื่อแสดงรูป</div>
-    <select id="public-folders" style="min-width:220px;"></select>
-    <button class="btn" id="show-btn" onclick="loadSelectedFolder()" style="margin-left:1.2em;">แสดงรูปในโฟลเดอร์</button>
-    <span id="folder-info"></span>
+  <div id="chooseFolderArea" style="display:none;margin:18px 0;">
+    <select id="folderSelect" style="min-width:240px;"></select>
+    <button class="btn" onclick="onPickFolder()">เลือกโฟลเดอร์</button>
   </div>
-  <div id="gallery"></div>
-  <div id="loading" style="text-align:center;margin:1.7rem;display:none;">กำลังโหลด...</div>
-</div>
 
+  <div class="header-banner">
+    <h1 id="headerTitle">Google Drive Gallery</h1>
+  </div>
+
+  <!-- Gallery -->
+  <div class="gallery" id="gallery"></div>
+  <div id="loadingSpinner"><div class="spinner"></div></div>
+  <div id="notification"></div>
+  <!-- Modal Lightbox -->
+  <div id="imageModal" class="modal">
+    <div class="modal-controls">
+      <button id="slideshowBtn" class="mac-btn mac-slideshow" onclick="toggleSlideshow()">▶</button>
+      <button id="fullscreenBtn" class="mac-btn mac-fullscreen" onclick="toggleFullScreen()">⛶</button>
+      <button id="closeBtn" class="mac-btn mac-close" onclick="closeModal()">&times;</button>
+    </div>
+    <img class="modal-content" id="modalImage">
+    <div id="modalDetails" style="color:#000;padding:10px;"></div>
+    <div id="modalQRCode"></div>
+    <button id="prevBtn" onclick="prevImage()">&#10094;</button>
+    <button id="nextBtn" onclick="nextImage()">&#10095;</button>
+  </div>
 <script>
-  // ====== CONFIG ของคุณ ======
+  // ====== CONFIG GOOGLE ======
   const CLIENT_ID = '258829783034-fthiotfelubgc5v5cr1l96fj2ta02v3u.apps.googleusercontent.com';
-  const API_KEY = 'AIzaSyA1shyUv4z3r__x2FGsZp-C9Pcmwl_1qHk';
-  const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+  const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email';
   // ===========================
 
-  let tokenClient;
   let accessToken = null;
+  let userEmail = null;
   let publicFolders = [];
+  let pickedFolderId = null;
+  let allImages = [];
+  let currentImageIndex = 0;
+  let slideshowInterval = null;
+  let slideshowPlaying = false;
 
-  // 1. Load GAPI & Picker
+  // โหลด GAPI
   function onGAPILoad() {
     gapi.load('client', async function() {
       await gapi.client.init({
-        apiKey: API_KEY,
         discoveryDocs:["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"]
       });
       document.getElementById('login-btn').disabled = false;
@@ -73,41 +134,47 @@
     }
   });
 
-  // 2. Login with Google
+  // Login/Logout
   window.handleAuthClick = function() {
-    tokenClient = google.accounts.oauth2.initTokenClient({
+    const tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
       callback: async (tokenResponse) => {
         accessToken = tokenResponse.access_token;
         document.getElementById('login-btn').style.display = "none";
         document.getElementById('logout-btn').style.display = "inline-block";
-        document.getElementById('step2').style.display = "";
+        await getUserEmail();
         await listPublicFolders();
-        showNotify('เข้าสู่ระบบสำเร็จ');
-      },
-      error_callback: (err) => {
-        showNotify('Google login failed: ' + (err && err.error_description ? err.error_description : 'Unknown'));
+        document.getElementById('chooseFolderArea').style.display = "";
+        showNotification('เข้าสู่ระบบสำเร็จ');
       }
     });
     tokenClient.requestAccessToken();
   };
-
-  // 3. Logout
   window.handleSignoutClick = function() {
     accessToken = null;
+    userEmail = null;
+    document.getElementById('user-email').innerHTML = '';
     document.getElementById('login-btn').style.display = "inline-block";
     document.getElementById('logout-btn').style.display = "none";
-    document.getElementById('step2').style.display = "none";
-    document.getElementById('gallery').innerHTML = "";
-    document.getElementById('folder-info').innerHTML = "";
-    document.getElementById('public-folders').innerHTML = "";
-    showNotify('ออกจากระบบแล้ว');
+    document.getElementById('chooseFolderArea').style.display = "none";
+    document.getElementById('gallery').innerHTML = '';
+    showNotification('ออกจากระบบแล้ว');
   };
 
-  // 4. List only shared folders (Anyone with the link)
+  // Get User Email
+  async function getUserEmail() {
+    let res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: {Authorization: `Bearer ${accessToken}`}
+    });
+    let info = await res.json();
+    userEmail = info.email || '';
+    document.getElementById('user-email').innerHTML = userEmail ? `👤 ${userEmail}` : '';
+  }
+
+  // List only shared folders (Anyone with the link)
   async function listPublicFolders() {
-    document.getElementById('public-folders').innerHTML = "<option>กำลังค้นหา...</option>";
+    document.getElementById('folderSelect').innerHTML = "<option>กำลังค้นหาโฟลเดอร์...</option>";
     publicFolders = [];
     let pageToken = null, folders = [];
     do {
@@ -123,65 +190,132 @@
       pageToken = res.result.nextPageToken;
     } while (pageToken);
 
-    // filter เฉพาะโฟลเดอร์ที่ permission เป็น anyone can read
     publicFolders = folders.filter(f=>{
       if (!f.permissions) return false;
-      return f.permissions.some(p => p.type=="anyone" && (p.role=="reader" || p.role=="writer" || p.role=="owner"));
+      return f.permissions.some(p => p.type==="anyone" && (p.role==="reader" || p.role==="writer" || p.role==="owner"));
     });
 
-    let sel = document.getElementById('public-folders');
+    let sel = document.getElementById('folderSelect');
     if(publicFolders.length === 0) {
-      sel.innerHTML = "<option value=''>-- ไม่มีโฟลเดอร์ที่แชร์เป็น Anyone with the link --</option>";
+      sel.innerHTML = "<option value=''>ไม่มีโฟลเดอร์ที่แชร์แบบ Anyone with the link</option>";
+      pickedFolderId = null;
     } else {
       sel.innerHTML = publicFolders.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
+      pickedFolderId = publicFolders[0].id;
     }
   }
 
-  // 5. เมื่อเลือก folder แล้วกดปุ่ม “แสดงรูปในโฟลเดอร์”
-  async function loadSelectedFolder() {
-    let sel = document.getElementById('public-folders');
-    let folderId = sel.value;
-    if (!folderId) return showNotify("กรุณาเลือกโฟลเดอร์");
-    let folderName = sel.options[sel.selectedIndex].text;
-    document.getElementById('folder-info').innerHTML = `📂 <b>${folderName}</b>`;
-    await listImagesInFolder(folderId);
+  // เมื่อเลือกโฟลเดอร์
+  function onPickFolder() {
+    let sel = document.getElementById('folderSelect');
+    pickedFolderId = sel.value;
+    if (!pickedFolderId) {
+      showNotification("กรุณาเลือกโฟลเดอร์");
+      document.getElementById('gallery').innerHTML = '';
+      return;
+    }
+    fetchImagesInFolder(pickedFolderId);
   }
 
-  // 6. ดึงไฟล์ภาพในโฟลเดอร์แบบ Anyone with the link (public link)
-  async function listImagesInFolder(folderId) {
-    document.getElementById('gallery').innerHTML = "";
-    document.getElementById('loading').style.display = "block";
+  // ดึงและแสดงรูปจากโฟลเดอร์ที่เลือก
+  async function fetchImagesInFolder(folderId) {
+    document.getElementById('gallery').innerHTML = '';
+    document.getElementById('loadingSpinner').style.display = 'block';
     try {
       let res = await gapi.client.drive.files.list({
         q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
-        fields: "files(id,name)",
+        fields: "files(id,name,createdTime)",
         pageSize: 100,
         supportsAllDrives: true,
         includeItemsFromAllDrives: true,
       });
       let files = res.result.files || [];
-      let html = "";
-      files.forEach(f=>{
-        let imgSrc = `https://drive.google.com/uc?export=view&id=${f.id}`;
-        html += `<div class="card">
-          <img src="${imgSrc}" alt="${f.name}" loading="lazy">
-          <div class="title">${f.name}</div>
-        </div>`;
-      });
-      document.getElementById('gallery').innerHTML = html || "<div>ไม่พบภาพในโฟลเดอร์นี้</div>";
+      allImages = files.sort((a,b)=>new Date(b.createdTime)-new Date(a.createdTime));
+      displayImages(allImages);
     } catch (err) {
-      showNotify("ดึงรูปไม่สำเร็จ: "+(err.result && err.result.error && err.result.error.message?err.result.error.message:err.message));
+      document.getElementById('gallery').innerHTML = "<div>เกิดข้อผิดพลาดในการดึงภาพ</div>";
     }
-    document.getElementById('loading').style.display = "none";
+    document.getElementById('loadingSpinner').style.display = 'none';
   }
 
-  // 7. Notify
-  function showNotify(msg) {
-    let d = document.createElement('div');
-    d.style = "position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#fffbe2;padding:0.6em 2em;border-radius:1.2em;box-shadow:0 4px 32px #0002;z-index:1111;color:#444;font-size:1.1em;";
-    d.innerHTML = msg;
-    document.body.appendChild(d);
-    setTimeout(()=>d.remove(),1700);
+  // แสดงผลภาพ (รองรับ Lightbox/QR/Slideshow/Modal)
+  function displayImages(images) {
+    const gallery = document.getElementById('gallery');
+    gallery.innerHTML = images.map((image,i) => `
+      <div class="image-item" data-driveid="${image.id}">
+        <img src="https://drive.google.com/uc?export=view&id=${image.id}" 
+             alt="${image.name}" style="width:400px;" onclick="openModal('${image.id}',${i})">
+      </div>
+    `).join('');
+  }
+
+  // Lightbox Modal
+  function openModal(imageId,index){
+    currentImageIndex = index;
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    const modalDetails = document.getElementById('modalDetails');
+    const modalQRCode = document.getElementById('modalQRCode');
+    modal.style.display = "block";
+    modal.classList.add("show");
+    let imgData = allImages[currentImageIndex];
+    modalImg.src = `https://drive.google.com/uc?export=view&id=${imgData.id}`;
+    let createdTimeFormatted = imgData ? new Date(imgData.createdTime).toLocaleString() : '';
+    modalDetails.innerHTML = `<p>${imgData ? imgData.name : ''}</p><p>${createdTimeFormatted}</p>`;
+    modalQRCode.innerHTML = "";
+    new QRCode(modalQRCode, {
+      text: `https://drive.google.com/uc?id=${imgData.id}`,
+      width: 100,
+      height: 100
+    });
+  }
+  function closeModal(){
+    document.getElementById('imageModal').classList.remove('show');
+    document.getElementById('imageModal').style.display = "none";
+    if(slideshowPlaying)toggleSlideshow();
+  }
+  function nextImage(){
+    if(allImages.length===0)return;
+    currentImageIndex = (currentImageIndex + 1) % allImages.length;
+    let img = allImages[currentImageIndex];
+    openModal(img.id,currentImageIndex);
+  }
+  function prevImage(){
+    if(allImages.length===0)return;
+    currentImageIndex = (currentImageIndex - 1 + allImages.length) % allImages.length;
+    let img = allImages[currentImageIndex];
+    openModal(img.id,currentImageIndex);
+  }
+  function toggleSlideshow(){
+    if(slideshowPlaying){
+      clearInterval(slideshowInterval);
+      slideshowPlaying = false;
+      document.getElementById('slideshowBtn').textContent = '▶';
+    }else{
+      slideshowInterval = setInterval(nextImage,3000);
+      slideshowPlaying = true;
+      document.getElementById('slideshowBtn').textContent = '❚❚';
+    }
+  }
+  function toggleFullScreen(){
+    const modal = document.getElementById('imageModal');
+    if(!document.fullscreenElement){
+      modal.requestFullscreen().catch(err=>alert(err.message));
+    }else{
+      document.exitFullscreen();
+    }
+  }
+
+  // Notification
+  function showNotification(message) {
+    const notification = document.getElementById('notification');
+    notification.textContent = message;
+    notification.style.display = "block";
+    setTimeout(() => { notification.style.opacity = "1"; }, 100);
+    setTimeout(() => {
+      notification.style.opacity = "0";
+      setTimeout(() => { notification.style.display = "none"; }, 500);
+    }, 3000);
   }
 </script>
 </body>

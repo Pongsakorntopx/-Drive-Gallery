@@ -135,7 +135,7 @@
     }
   }
 
-  // 5. ดึงไฟล์ภาพในโฟลเดอร์ (โหลดด้วย token แบบ blob)
+  // 5. ดึงไฟล์ภาพในโฟลเดอร์ (โหลดเป็น blob ด้วย access token)
   async function listImagesInFolder(folderId) {
     document.getElementById('gallery').innerHTML = "";
     document.getElementById('loading').style.display = "block";
@@ -143,7 +143,7 @@
       let res = await gapi.client.drive.files.list({
         q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
         fields: "files(id,name,mimeType)",
-        pageSize: 40,
+        pageSize: 50,
         supportsAllDrives: true,
         includeItemsFromAllDrives: true,
       });

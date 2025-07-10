@@ -13,8 +13,10 @@
     .main {max-width:980px;margin:2.5rem auto;background:#fff;border-radius:18px;box-shadow:0 4px 32px #0002;padding:2rem;}
     .btn {background:#1976d2;color:#fff;border:none;border-radius:8px;padding:0.7em 1.5em;cursor:pointer;font-size:1.08rem;}
     #gallery {display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1.3rem;}
-    .card {background:#f7fafd;border-radius:1em;box-shadow:0 2px 12px #0001;overflow:hidden;}
-    .card img {width:100%;display:block;}
+    .card {background:#f7fafd;border-radius:1em;box-shadow:0 2px 12px #0001;overflow:hidden;transition:box-shadow .23s;}
+    .card:hover {box-shadow: 0 4px 24px #1976d255;}
+    .card img {width:100%;display:block;transition:transform 0.24s;cursor:pointer;background:#eee;}
+    .card img:hover {transform:scale(1.06);box-shadow:0 8px 24px #0002;}
     .card .title {font-size:1rem;padding:0.5em 1em;color:#1976d2;}
     .info {color:#555;font-size:1.07rem;margin-bottom:1.2em;}
   </style>
@@ -133,30 +135,30 @@
     }
   }
 
-  // 5. ดึงไฟล์ภาพในโฟลเดอร์
+  // 5. ดึงไฟล์ภาพในโฟลเดอร์ (เวอร์ชันใหม่ ใช้ direct link)
   async function listImagesInFolder(folderId) {
     document.getElementById('gallery').innerHTML = "";
     document.getElementById('loading').style.display = "block";
     try {
       let res = await gapi.client.drive.files.list({
         q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
-        fields: "files(id,name,thumbnailLink,webContentLink)",
+        fields: "files(id,name)",
         pageSize: 100,
         supportsAllDrives: true,
         includeItemsFromAllDrives: true,
       });
       let files = res.result.files || [];
       let html = "";
-      files.forEach(f=>{
-        let src = f.thumbnailLink ? f.thumbnailLink.replace("=s220", "=s800") : f.webContentLink;
+      files.forEach(f => {
+        let imgSrc = `https://drive.google.com/uc?export=view&id=${f.id}`;
         html += `<div class="card">
-          <img src="${src}" alt="${f.name}" loading="lazy">
+          <img src="${imgSrc}" alt="${f.name}" loading="lazy">
           <div class="title">${f.name}</div>
         </div>`;
       });
       document.getElementById('gallery').innerHTML = html || "<div>ไม่พบภาพในโฟลเดอร์นี้</div>";
     } catch (err) {
-      showNotify("ดึงรูปไม่สำเร็จ: "+(err.result && err.result.error && err.result.error.message?err.result.error.message:err.message));
+      showNotify("ดึงรูปไม่สำเร็จ: " + (err.result && err.result.error && err.result.error.message ? err.result.error.message : err.message));
     }
     document.getElementById('loading').style.display = "none";
   }

@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>Google Drive Photo Picker Gallery</title>
+  <title>Google Drive Public Folder Gallery</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://apis.google.com/js/api.js"></script>
@@ -19,11 +19,12 @@
     .card img:hover {transform:scale(1.06);box-shadow:0 8px 24px #0002;}
     .card .title {font-size:1rem;padding:0.5em 1em;color:#1976d2;}
     .info {color:#555;font-size:1.07rem;margin-bottom:1.2em;}
+    select {font-size:1.09rem;padding:0.38em 1em;border-radius:8px;}
   </style>
 </head>
 <body>
 <header>
-  Google Drive Photo Gallery
+  Google Drive Public Folder Gallery
 </header>
 <div class="main">
   <div id="auth-area">
@@ -31,8 +32,9 @@
     <button class="btn" id="logout-btn" onclick="handleSignoutClick()" style="display:none;">Logout</button>
   </div>
   <div id="step2" style="display:none;">
-    <div class="info">เลือกโฟลเดอร์ Google Drive ที่ต้องการแสดงภาพ</div>
-    <button class="btn" id="pick-btn" onclick="showPicker()">เลือกโฟลเดอร์</button>
+    <div class="info">เลือกโฟลเดอร์ Google Drive <b>(ที่แชร์แบบ Anyone with the link)</b> เพื่อแสดงรูป</div>
+    <select id="public-folders" style="min-width:220px;"></select>
+    <button class="btn" id="show-btn" onclick="loadSelectedFolder()" style="margin-left:1.2em;">แสดงรูปในโฟลเดอร์</button>
     <span id="folder-info"></span>
   </div>
   <div id="gallery"></div>
@@ -47,29 +49,22 @@
   // ===========================
 
   let tokenClient;
-  let accessToken = null, pickedFolderId = null;
-
-  let gapiLoaded = false;
-  let pickerLoaded = false;
-  let clientInited = false;
+  let accessToken = null;
+  let publicFolders = [];
 
   // 1. Load GAPI & Picker
   function onGAPILoad() {
-    gapi.load('client:picker', async function() {
-      gapiLoaded = true;
+    gapi.load('client', async function() {
       await gapi.client.init({
         apiKey: API_KEY,
         discoveryDocs:["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"]
       });
-      clientInited = true;
       document.getElementById('login-btn').disabled = false;
     });
   }
-  // รอ api.js load เสร็จจริงก่อนเรียก onGAPILoad
   window.addEventListener('load', () => {
     if (window.gapi) onGAPILoad();
     else {
-      // fallback: poll check
       let timer = setInterval(()=>{
         if(window.gapi) {
           clearInterval(timer); onGAPILoad();
@@ -88,6 +83,7 @@
         document.getElementById('login-btn').style.display = "none";
         document.getElementById('logout-btn').style.display = "inline-block";
         document.getElementById('step2').style.display = "";
+        await listPublicFolders();
         showNotify('เข้าสู่ระบบสำเร็จ');
       },
       error_callback: (err) => {
@@ -105,80 +101,81 @@
     document.getElementById('step2').style.display = "none";
     document.getElementById('gallery').innerHTML = "";
     document.getElementById('folder-info').innerHTML = "";
+    document.getElementById('public-folders').innerHTML = "";
     showNotify('ออกจากระบบแล้ว');
   };
 
-  // 4. Google Picker (เลือกโฟลเดอร์)
-  function showPicker() {
-    if (!accessToken) return showNotify('กรุณา Login ก่อน');
-    if (!window.google || !window.google.picker) return showNotify('Picker API ยังไม่โหลด ลองรีเฟรช');
+  // 4. List only shared folders (Anyone with the link)
+  async function listPublicFolders() {
+    document.getElementById('public-folders').innerHTML = "<option>กำลังค้นหา...</option>";
+    publicFolders = [];
+    let pageToken = null, folders = [];
+    do {
+      let res = await gapi.client.drive.files.list({
+        q: `mimeType = 'application/vnd.google-apps.folder' and trashed = false and 'me' in owners`,
+        fields: "nextPageToken,files(id,name,permissions)",
+        pageToken: pageToken,
+        pageSize: 100,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+      });
+      folders = folders.concat(res.result.files);
+      pageToken = res.result.nextPageToken;
+    } while (pageToken);
 
-    let view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
-      .setMimeTypes('application/vnd.google-apps.folder')
-      .setSelectFolderEnabled(true);
+    // filter เฉพาะโฟลเดอร์ที่ permission เป็น anyone can read
+    publicFolders = folders.filter(f=>{
+      if (!f.permissions) return false;
+      return f.permissions.some(p => p.type=="anyone" && (p.role=="reader" || p.role=="writer" || p.role=="owner"));
+    });
 
-    let picker = new google.picker.PickerBuilder()
-      .addView(view)
-      .setOAuthToken(accessToken)
-      .setDeveloperKey(API_KEY)
-      .setTitle("เลือกโฟลเดอร์ภาพจาก Google Drive")
-      .setCallback(pickerCallback)
-      .build();
-    picker.setVisible(true);
-  }
-
-  function pickerCallback(data) {
-    if (data.action == google.picker.Action.PICKED) {
-      pickedFolderId = data.docs[0].id;
-      document.getElementById('folder-info').innerHTML = `📂 <b>${data.docs[0].name}</b>`;
-      listImagesInFolder(pickedFolderId);
+    let sel = document.getElementById('public-folders');
+    if(publicFolders.length === 0) {
+      sel.innerHTML = "<option value=''>-- ไม่มีโฟลเดอร์ที่แชร์เป็น Anyone with the link --</option>";
+    } else {
+      sel.innerHTML = publicFolders.map(f=>`<option value="${f.id}">${f.name}</option>`).join("");
     }
   }
 
-  // 5. ดึงไฟล์ภาพในโฟลเดอร์ (โหลดเป็น blob ด้วย access token)
+  // 5. เมื่อเลือก folder แล้วกดปุ่ม “แสดงรูปในโฟลเดอร์”
+  async function loadSelectedFolder() {
+    let sel = document.getElementById('public-folders');
+    let folderId = sel.value;
+    if (!folderId) return showNotify("กรุณาเลือกโฟลเดอร์");
+    let folderName = sel.options[sel.selectedIndex].text;
+    document.getElementById('folder-info').innerHTML = `📂 <b>${folderName}</b>`;
+    await listImagesInFolder(folderId);
+  }
+
+  // 6. ดึงไฟล์ภาพในโฟลเดอร์แบบ Anyone with the link (public link)
   async function listImagesInFolder(folderId) {
     document.getElementById('gallery').innerHTML = "";
     document.getElementById('loading').style.display = "block";
     try {
       let res = await gapi.client.drive.files.list({
         q: `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`,
-        fields: "files(id,name,mimeType)",
-        pageSize: 50,
+        fields: "files(id,name)",
+        pageSize: 100,
         supportsAllDrives: true,
         includeItemsFromAllDrives: true,
       });
       let files = res.result.files || [];
-      if (!files.length) {
-        document.getElementById('gallery').innerHTML = "<div>ไม่พบภาพในโฟลเดอร์นี้</div>";
-        document.getElementById('loading').style.display = "none";
-        return;
-      }
       let html = "";
-      for (let f of files) {
-        let blobUrl = await getDriveFileBlobUrl(f.id);
+      files.forEach(f=>{
+        let imgSrc = `https://drive.google.com/uc?export=view&id=${f.id}`;
         html += `<div class="card">
-          <img src="${blobUrl}" alt="${f.name}" loading="lazy">
+          <img src="${imgSrc}" alt="${f.name}" loading="lazy">
           <div class="title">${f.name}</div>
         </div>`;
-      }
-      document.getElementById('gallery').innerHTML = html;
+      });
+      document.getElementById('gallery').innerHTML = html || "<div>ไม่พบภาพในโฟลเดอร์นี้</div>";
     } catch (err) {
-      showNotify("ดึงรูปไม่สำเร็จ: " + (err.result && err.result.error && err.result.error.message ? err.result.error.message : err.message));
+      showNotify("ดึงรูปไม่สำเร็จ: "+(err.result && err.result.error && err.result.error.message?err.result.error.message:err.message));
     }
     document.getElementById('loading').style.display = "none";
   }
 
-  // ใช้ token ไปดึงรูป Google Drive แบบ blob (ไม่ต้องแชร์ public)
-  async function getDriveFileBlobUrl(fileId) {
-    let url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-    let res = await fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + accessToken }
-    });
-    let blob = await res.blob();
-    return URL.createObjectURL(blob);
-  }
-
-  // 6. Notify
+  // 7. Notify
   function showNotify(msg) {
     let d = document.createElement('div');
     d.style = "position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#fffbe2;padding:0.6em 2em;border-radius:1.2em;box-shadow:0 4px 32px #0002;z-index:1111;color:#444;font-size:1.1em;";
